@@ -209,6 +209,7 @@ async def edit_entry(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def edit_picked(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Запись выбрана — предлагаем: изменить число или удалить целиком."""
     query = update.callback_query
     await query.answer()
     _, set_id, count = query.data.split(":")
@@ -219,11 +220,71 @@ async def edit_picked(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return ConversationHandler.END
 
     context.user_data["edit_id"] = set_id
+    kb = InlineKeyboardMarkup(
+        [
+            [InlineKeyboardButton("✏️ Изменить число", callback_data=f"chg:{set_id}:{count}")],
+            [InlineKeyboardButton("🗑 Удалить запись", callback_data=f"del:{set_id}")],
+        ]
+    )
     await query.edit_message_text(
-        f"Запись №{set_id} (сейчас: {count} раз).\n\n"
-        "Напиши новое число, либо слово «удалить», чтобы убрать запись."
+        f"Запись №{set_id} (сейчас: {count} раз). Что сделать?", reply_markup=kb
     )
     return EDIT_VALUE
+
+
+async def edit_change(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Нажали «Изменить число» — просим новое значение."""
+    query = update.callback_query
+    await query.answer()
+    _, set_id, count = query.data.split(":")
+    context.user_data["edit_id"] = int(set_id)
+    await query.edit_message_text(
+        f"Запись №{set_id} (сейчас: {count} раз).\nНапиши новое число:"
+    )
+    return EDIT_VALUE
+
+
+async def edit_delete_ask(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Нажали «Удалить» — спрашиваем подтверждение."""
+    query = update.callback_query
+    await query.answer()
+    set_id = int(query.data.split(":")[1])
+    kb = InlineKeyboardMarkup(
+        [
+            [InlineKeyboardButton("✅ Да, удалить", callback_data=f"delok:{set_id}")],
+            [InlineKeyboardButton("↩️ Нет, оставить", callback_data="delno")],
+        ]
+    )
+    await query.edit_message_text(
+        f"Точно удалить запись №{set_id} целиком?", reply_markup=kb
+    )
+    return EDIT_VALUE
+
+
+async def edit_delete_ok(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    set_id = int(query.data.split(":")[1])
+    if db.set_owner(set_id) != query.from_user.id:
+        await query.edit_message_text("Это не твоя запись 🙅")
+        return ConversationHandler.END
+    db.delete_set(set_id)
+    context.user_data.pop("edit_id", None)
+    await query.edit_message_text(f"🗑 Запись №{set_id} удалена.")
+    await query.message.reply_html(
+        f"Всего теперь: <b>{db.total_count(query.from_user.id)}</b>",
+        reply_markup=MAIN_KB,
+    )
+    return ConversationHandler.END
+
+
+async def edit_delete_no(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    context.user_data.pop("edit_id", None)
+    await query.edit_message_text("Ок, ничего не удалял. 👌")
+    await query.message.reply_text("Главное меню 👇", reply_markup=MAIN_KB)
+    return ConversationHandler.END
 
 
 async def edit_value(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -434,6 +495,10 @@ def main() -> None:
         states={
             EDIT_VALUE: [
                 CallbackQueryHandler(edit_picked, pattern=r"^pick:"),
+                CallbackQueryHandler(edit_change, pattern=r"^chg:"),
+                CallbackQueryHandler(edit_delete_ask, pattern=r"^del:"),
+                CallbackQueryHandler(edit_delete_ok, pattern=r"^delok:"),
+                CallbackQueryHandler(edit_delete_no, pattern=r"^delno$"),
                 MessageHandler(filters.TEXT & ~filters.COMMAND, edit_value),
             ],
         },
