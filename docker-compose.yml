@@ -1,0 +1,9 @@
+services:
+  pushup-bot:
+    build: .
+    image: pushup-counter-bot:latest
+    container_name: pushup-counter-bot
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      - ./data:/data
