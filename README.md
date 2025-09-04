@@ -132,3 +132,9 @@ requirements.txt
 
 The `data/` folder and `.env` are excluded from git (`.gitignore`) — the token and
 personal data never end up in the repository.
+
+## License
+
+Licensed under [PolyForm Noncommercial 1.0.0](LICENSE) — free for personal,
+educational, and other noncommercial use. Commercial use requires a separate
+license; contact damir.brera.eb@gmail.com.
