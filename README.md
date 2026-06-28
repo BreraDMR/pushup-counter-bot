@@ -1,82 +1,109 @@
+<div align="center">
+
 # 💪 Pushup Counter Bot
 
-Телеграм-бот — счётчик отжиманий. Интерактивный: всё управляется **кнопками
-внизу экрана** и пошаговыми диалогами (бот спрашивает — ты отвечаешь). Смотри
-красивые графики (в стиле Excel), соревнуйся с другими участниками в общем
-рейтинге и прикрепляй фото к подходам. Все данные хранятся в SQLite — для
-каждого пользователя отдельно. Команды через `/` тоже работают как дубль.
+**A Telegram bot that turns "I'll do pushups" into a habit you can actually see — log sets in two taps, watch your progress on charts, and compete with friends on a shared leaderboard.**
 
-## Возможности
+[![Python](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white&style=for-the-badge)](requirements.txt)
+[![python-telegram-bot](https://img.shields.io/badge/python--telegram--bot-21.x%20async-2CA5E0?logo=telegram&logoColor=white&style=for-the-badge)](requirements.txt)
+[![matplotlib](https://img.shields.io/badge/matplotlib-charts-11557C?style=for-the-badge)](bot/charts.py)
+[![SQLite](https://img.shields.io/badge/SQLite-storage-003B57?logo=sqlite&logoColor=white&style=for-the-badge)](bot/db.py)
+[![Docker](https://img.shields.io/badge/Docker-2496ED?logo=docker&logoColor=white&style=for-the-badge)](docker-compose.yml)
 
-- **Регистрация с именем** — при первом `/start` бот спрашивает, как записать
-  тебя в рейтинге (можно сменить позже кнопкой «Сменить имя»).
-- **Запись подходов** — кнопка «Записать подход»: бот спрашивает, сколько раз
-  ты отжался, и ты пишешь число (или команда `/add 20`).
-- **Графики:**
-  - `/chart` — линейный график отжиманий по подходам;
-  - `/total` — накопительный график «сколько уже всего отжался»;
-  - `/days` — гистограмма по дням (сколько в какой день, с подсветкой рекорда).
-- **Статистика** — `/today`, `/stats` (всего, подходов, дней, среднее, лучший день).
-- **Рейтинг** — кнопка «Рейтинг» (`/top`): все участники, их суммы и процент от
-  цели в 100 000.
-- **Редактирование и удаление** — кнопка «Изменить записи»: бот показывает
-  последние записи кнопками, ты выбираешь нужную, а дальше кнопками выбираешь
-  «✏️ Изменить число» или «🗑 Удалить запись» (удаление — с подтверждением).
-  Правишь только свои записи; команда `/edit` тоже работает.
-- **Фото (по желанию)** — пришли фото после подхода, оно сохранится локально
-  (`data/photos/<user_id>/`) и привяжется к последней записи.
-- **Мультипользовательский режим** — данные изолированы по `user_id`.
+</div>
 
-## Команды
+A Telegram bot for counting pushups. It's fully interactive: everything is driven
+by **on-screen buttons** and step-by-step dialogs (the bot asks, you answer), so
+you never have to remember syntax. See clean Excel-style charts, compete with
+other people on a shared leaderboard, and attach a photo to a set. All data lives
+in SQLite, kept **separately per user**. Slash commands work too, as a shortcut.
 
-Обычно достаточно кнопок, но всё доступно и командами:
+## The problems it solves
 
-| Команда | Описание |
+- **Tracking workouts in your head doesn't stick.** Each set — just a number — is
+  logged in a guided chat flow ("Log a set" → type how many you did), so the
+  record takes seconds and there's no app to install beyond Telegram.
+- **A bare count isn't motivating.** The bot renders **charts** (`matplotlib`):
+  pushups per set, a cumulative "how many in total" curve, and a per-day histogram
+  that highlights your record day — so progress is something you can actually look at.
+- **Doing it alone is easy to drop.** A shared **leaderboard** (`/top`) ranks
+  every participant by their total and their percentage toward a common 100,000
+  goal, turning it into a friendly competition.
+- **Mistakes happen when you log fast.** You can **edit or delete** your own
+  entries from a button list (delete asks for confirmation) — you can only touch
+  your own records.
+- **One bot, many users.** All data is isolated by `user_id`, so a group of
+  friends can share the same bot without seeing each other's raw entries.
+
+## Features
+
+- **Registration with a name** — on the first `/start` the bot asks how to list
+  you on the leaderboard (changeable later via "Change name").
+- **Logging sets** — "Log a set" button: the bot asks how many pushups you did and
+  you type the number (or `/add 20`).
+- **Charts:**
+  - `/chart` — line chart of pushups per set;
+  - `/total` — cumulative "total pushups so far" chart;
+  - `/days` — per-day histogram (with the record day highlighted).
+- **Stats** — `/today`, `/stats` (total, sets, days, average, best day).
+- **Leaderboard** — `/top`: all participants, their totals and % of the 100,000 goal.
+- **Edit & delete** — "Edit entries" button: the bot shows your recent entries as
+  buttons; pick one, then "✏️ Change number" or "🗑 Delete entry" (delete with
+  confirmation). You can only edit your own entries; `/edit` works too.
+- **Photos (optional)** — send a photo after a set and it's saved locally
+  (`data/photos/<user_id>/`) and attached to the last entry.
+- **Multi-user** — data isolated per `user_id`.
+
+## Commands
+
+Buttons are usually enough, but everything is available as a command too:
+
+| Command | Description |
 |---|---|
-| `/start` | регистрация (спросит имя) и главное меню |
-| `/setname` | сменить имя в рейтинге |
-| `/add` (или `/add 20`) | записать подход — спросит число, либо задать сразу |
-| `/today` | сколько отжался сегодня |
-| `/total` | всего за всё время + накопительный график |
-| `/chart` | график отжиманий по подходам |
-| `/days` | гистограмма по дням |
-| `/stats` | сводка цифрами |
-| `/top` | рейтинг всех участников (% от 100000) |
-| `/edit` | выбрать запись и исправить/удалить |
-| `/cancel` | отменить текущий диалог |
-| `/help` | справка |
+| `/start` | register (asks your name) and open the main menu |
+| `/setname` | change your leaderboard name |
+| `/add` (or `/add 20`) | log a set — asks for the number, or set it inline |
+| `/today` | how many pushups today |
+| `/total` | all-time total + cumulative chart |
+| `/chart` | pushups-per-set chart |
+| `/days` | per-day histogram |
+| `/stats` | numeric summary |
+| `/top` | leaderboard (% of 100,000) |
+| `/edit` | pick an entry and fix/delete it |
+| `/cancel` | cancel the current dialog |
+| `/help` | help |
 
-## Технологии
+## Tech
 
 - Python 3.12
 - [python-telegram-bot](https://docs.python-telegram-bot.org) 21.x (async)
-- matplotlib — построение графиков
-- SQLite — хранение данных
-- Docker / docker-compose — деплой
+- matplotlib — chart rendering
+- SQLite — storage
+- Docker / docker-compose — deployment
 
-## Запуск
+## Running
 
-### 1. Токен
+### 1. Token
 
-Получи токен у [@BotFather](https://t.me/BotFather), скопируй пример конфига и
-вставь токен:
+Get a token from [@BotFather](https://t.me/BotFather), copy the example config and
+paste the token in:
 
 ```bash
 cp .env.example .env
-# отредактируй .env → BOT_TOKEN=...
+# edit .env → BOT_TOKEN=...
 ```
 
-### 2. Docker (рекомендуется)
+### 2. Docker (recommended)
 
 ```bash
 docker compose up -d --build
 docker compose logs -f
 ```
 
-База и фото сохраняются в локальную папку `./data` (она примонтирована в
-`/data` внутри контейнера) и переживают перезапуски.
+The database and photos are stored in the local `./data` folder (mounted to
+`/data` inside the container) and survive restarts.
 
-### 3. Локально без Docker
+### 3. Locally without Docker
 
 ```bash
 python -m venv .venv && source .venv/bin/activate
@@ -85,23 +112,23 @@ export BOT_TOKEN=... DB_PATH=./data/pushups.db PHOTO_DIR=./data/photos
 python -m bot.main
 ```
 
-## Структура
+## Structure
 
 ```
 bot/
-  main.py     — хендлеры команд и запуск бота
-  db.py       — слой SQLite (пользователи, подходы, фото)
-  charts.py   — отрисовка графиков (matplotlib)
+  main.py     — command handlers and bot startup
+  db.py       — SQLite layer (users, sets, photos)
+  charts.py   — chart rendering (matplotlib)
 Dockerfile
 docker-compose.yml
 requirements.txt
 .env.example
 ```
 
-## Данные
+## Data
 
-- `data/pushups.db` — база SQLite.
-- `data/photos/<user_id>/set_<id>.jpg` — фото подходов.
+- `data/pushups.db` — the SQLite database.
+- `data/photos/<user_id>/set_<id>.jpg` — set photos.
 
-Папка `data/` и `.env` исключены из git (`.gitignore`) — токен и личные данные
-в репозиторий не попадают.
+The `data/` folder and `.env` are excluded from git (`.gitignore`) — the token and
+personal data never end up in the repository.
