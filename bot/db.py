@@ -27,16 +27,17 @@ def _connect() -> Iterator[sqlite3.Connection]:
 
 
 def init_db() -> None:
-    """Создаёт таблицы, если их ещё нет."""
+    """Создаёт таблицы, если их ещё нет (с лёгкой миграцией display_name)."""
     os.makedirs(os.path.dirname(DB_PATH) or ".", exist_ok=True)
     with _connect() as conn:
         conn.executescript(
             """
             CREATE TABLE IF NOT EXISTS users (
-                user_id     INTEGER PRIMARY KEY,
-                username    TEXT,
-                first_name  TEXT,
-                created_at  TEXT NOT NULL
+                user_id       INTEGER PRIMARY KEY,
+                username      TEXT,
+                first_name    TEXT,
+                display_name  TEXT,
+                created_at    TEXT NOT NULL
             );
 
             CREATE TABLE IF NOT EXISTS sets (
@@ -51,20 +52,50 @@ def init_db() -> None:
             CREATE INDEX IF NOT EXISTS idx_sets_user ON sets(user_id, created_at);
             """
         )
+        # Миграция для старых БД, созданных без display_name
+        cols = {r["name"] for r in conn.execute("PRAGMA table_info(users)")}
+        if "display_name" not in cols:
+            conn.execute("ALTER TABLE users ADD COLUMN display_name TEXT")
+
+
+def user_exists(user_id: int) -> bool:
+    with _connect() as conn:
+        return conn.execute(
+            "SELECT 1 FROM users WHERE user_id = ?", (user_id,)
+        ).fetchone() is not None
 
 
 def upsert_user(user_id: int, username: Optional[str], first_name: Optional[str]) -> None:
+    """Гарантирует наличие пользователя. Отображаемое имя (display_name)
+    задаётся при первом создании из имени Telegram и НЕ перезатирается потом —
+    его меняет только set_display_name (через регистрацию/смену имени)."""
     with _connect() as conn:
         conn.execute(
             """
-            INSERT INTO users (user_id, username, first_name, created_at)
-            VALUES (?, ?, ?, ?)
+            INSERT INTO users (user_id, username, first_name, display_name, created_at)
+            VALUES (?, ?, ?, ?, ?)
             ON CONFLICT(user_id) DO UPDATE SET
                 username = excluded.username,
                 first_name = excluded.first_name
             """,
-            (user_id, username, first_name, datetime.now().isoformat(timespec="seconds")),
+            (user_id, username, first_name, first_name,
+             datetime.now().isoformat(timespec="seconds")),
         )
+
+
+def set_display_name(user_id: int, name: str) -> None:
+    with _connect() as conn:
+        conn.execute("UPDATE users SET display_name = ? WHERE user_id = ?", (name, user_id))
+
+
+def get_display_name(user_id: int) -> Optional[str]:
+    with _connect() as conn:
+        row = conn.execute(
+            "SELECT COALESCE(display_name, first_name, username) AS name "
+            "FROM users WHERE user_id = ?",
+            (user_id,),
+        ).fetchone()
+        return row["name"] if row else None
 
 
 def add_set(user_id: int, count: int) -> int:
@@ -147,7 +178,7 @@ def leaderboard() -> list[tuple[str, int]]:
         rows = conn.execute(
             """
             SELECT u.user_id,
-                   COALESCE(u.first_name, u.username, 'Аноним') AS name,
+                   COALESCE(u.display_name, u.first_name, u.username, 'Аноним') AS name,
                    COALESCE(SUM(s.count), 0) AS total
             FROM users u
             LEFT JOIN sets s ON s.user_id = u.user_id
