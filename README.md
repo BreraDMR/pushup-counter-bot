@@ -12,6 +12,10 @@
 
 </div>
 
+https://github.com/user-attachments/assets/5cea0db1-241b-45f5-880a-9f2f98d7fd38
+
+<sub>A 22-second overview. The chat is the bot's own replies, buttons and charts, recorded offline from its real handlers on demo data. The bot's interface is in Russian. The file is also in <a href="docs/media/pushup-counter-bot-overview.mp4"><code>docs/media/pushup-counter-bot-overview.mp4</code></a>.</sub>
+
 A Telegram bot for counting pushups. It's fully interactive: everything is driven
 by **on-screen buttons** and step-by-step dialogs (the bot asks, you answer), so
 you never have to remember syntax. See clean Excel-style charts, compete with
